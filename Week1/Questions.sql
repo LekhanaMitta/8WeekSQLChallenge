@@ -52,6 +52,18 @@ SELECT customer_id, product_name, cnt FROM r
 WHERE r = 1;
 
 -- 6. Which item was purchased first by the customer after they became a member?
+SELECT customer_id, t.product_id, product_name FROM 
+(SELECT s.customer_id, s.product_id, s.order_date,
+	DENSE_RANK() OVER (PARTITION BY s.customer_id
+                       ORDER BY s.order_date ASC) AS r
+FROM sales s
+INNER JOIN members m 
+ON s.customer_id = m.customer_id
+WHERE s.order_date > (SELECT join_date FROM members
+                      WHERE s.customer_id = customer_id)) t
+JOIN menu m ON t.product_id = m.product_id
+WHERE r = 1;
+
 -- 7. Which item was purchased just before the customer became a member?
 -- 8. What is the total items and amount spent for each member before they became a member?
 -- 9.  If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
