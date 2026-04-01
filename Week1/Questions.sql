@@ -109,4 +109,60 @@ FROM (SELECT s.customer_id,
         GROUP BY s.customer_id,s.product_id) AS t
 GROUP BY customer_id;
 -- 9.  If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
+SELECT customer_id, SUM(points) AS total_points FROM
+(
+   SELECT customer_id,
+   SUM(price *
+      CASE 
+          WHEN m.product_id = 1 THEN 20
+          ELSE 10
+      END) AS points
+  FROM sales s
+  JOIN menu m ON m.product_id = s.product_id
+  GROUP BY customer_id
+) t
+GROUP BY customer_id
+ORDER BY customer_id;
+
 -- 10. In the first week after a customer joins the program (including their join date) they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January?
+SELECT T1.customer_id, 
+	before_member_points, 
+    CASE 
+    	WHEN after_member_points IS NULL THEN 0
+        ELSE after_member_points
+    END AS after_member_points, 
+    (before_member_points + 
+    	CASE 
+    	WHEN after_member_points IS NULL THEN 0
+        ELSE after_member_points
+    	END) AS total_points FROM
+(SELECT customer_id, SUM(points) AS before_member_points
+FROM (
+		SELECT s.customer_id, 
+  			SUM(price *
+                CASE
+                	WHEN m.product_id = 3 THEN 20
+                	ELSE 10
+                END) AS points
+  		FROM sales s
+  		JOIN menu m ON m.product_id = s.product_id
+  		LEFT JOIN members mem ON mem.customer_id = s.customer_id
+  		WHERE mem.join_date IS NULL OR 
+  				s.order_date < mem.join_date
+  		GROUP BY s.customer_id
+)AS t1
+GROUP BY customer_id) AS T1
+LEFT JOIN
+(SELECT customer_id, SUM(points) AS after_member_points
+FROM (
+		SELECT s.customer_id, 
+  			SUM(price * 20) AS points
+  		FROM sales s
+  		JOIN menu m ON m.product_id = s.product_id
+  		LEFT JOIN members mem ON mem.customer_id = s.customer_id
+  		WHERE s.order_date >= mem.join_date
+  		GROUP BY s.customer_id
+)AS t2
+GROUP BY customer_id) AS T2
+ON T1.customer_id = T2.customer_id;
+;
