@@ -65,5 +65,113 @@ GROUP BY c.customer_id
 ORDER BY c.customer_id;
 
 -- 8. How many pizzas were delivered that had both exclusions and extras?
+SELECT 
+    c.pizza_id,
+    SUM(
+        CASE 
+            WHEN exclusions NOT IN ('', 'null') 
+              AND extras NOT IN ('', 'null') THEN 1
+            ELSE 0
+        END
+    ) AS changes
+FROM customer_orders c
+JOIN runner_orders r 
+    ON c.order_id = r.order_id
+WHERE cancellation IS NULL 
+   OR cancellation NOT LIKE '%Cancellation%'
+GROUP BY c.pizza_id
+ORDER BY c.pizza_id;
+
 -- 9. What was the total volume of pizzas ordered for each hour of the day?
+SELECT EXTRACT(HOUR FROM order_time) AS Hours, 
+	COUNT(*) FROM customer_orders
+GROUP BY Hours
+ORDER BY Hours;
+
 -- 10. What was the volume of orders for each day of the week?
+SELECT 
+    TO_CHAR(order_time, 'Day') AS day_of_week,
+    COUNT(DISTINCT order_id) AS total_orders
+FROM customer_orders
+GROUP BY day_of_week;
+
+-- B. Runner and Customer Experience
+-- 1.  How many runners signed up for each 1 week period? (i.e. week starts 2021-01-01)
+SELECT FLOOR((registration_date - DATE '2021-01-01') / 7) + 1 AS week,
+       COUNT(runner_id)
+FROM runners
+GROUP BY week
+ORDER BY week;
+
+-- 2. What was the average time in minutes it took for each runner to arrive at the Pizza Runner HQ to pickup the order?
+SELECT r.runner_id,
+       AVG(
+         NULLIF(r.pickup_time, 'null')::timestamp 
+         - c.order_time::timestamp
+       ) AS avg_pickup_time
+FROM customer_orders c
+JOIN runner_orders r
+  ON c.order_id = r.order_id
+WHERE NULLIF(r.pickup_time, 'null') IS NOT NULL
+GROUP BY r.runner_id;
+
+-- 3. Is there any relationship between the number of pizzas and how long the order takes to prepare?
+
+
+-- 4. What was the average distance travelled for each customer?
+SELECT 
+    c.customer_id, 
+    AVG(NULLIF(REPLACE(distance, 'km', ''), '')::NUMERIC) AS avg_distance
+FROM runner_orders r
+JOIN customer_orders c 
+    ON r.order_id = c.order_id
+WHERE r.distance IS NOT NULL
+  AND r.distance <> 'null'
+GROUP BY c.customer_id;
+
+-- 5. What was the difference between the longest and shortest delivery times for all orders?
+SELECT 
+	MAX(NULLIF(REPLACE(distance, 'km', ''),'')::Numeric),
+	MIN(NULLIF(REPLACE(distance, 'km', ''),'')::Numeric) 
+    FROM runner_orders
+WHERE distance <> 'null' 
+	AND distance IS NOT NULL;
+
+-- 6. What was the average speed for each runner for each delivery and do you notice any trend for these values?
+SELECT runner_id, 
+AVG(
+        60*NULLIF(TRIM(REPLACE(distance, 'km', '')), '')::numeric
+        /
+        NULLIF(
+                REPLACE(
+                    REPLACE(
+                        REPLACE(duration, 'minutes', ''),
+                    'minute', ''),
+                'mins', ''),
+            '')::numeric
+    ) AS avg_speed
+FROM runner_orders
+WHERE duration <> 'null'
+AND distance <> 'null'
+GROUP BY runner_id;
+
+-- 7. What is the successful delivery percentage for each runner?
+SELECT a.runner_id, 
+	(SELECT COUNT(order_id) 
+     	FROM runner_orders b
+    	WHERE a.runner_id = b.runner_id) AS assigned,
+     (SELECT COUNT(order_id)
+      	FROM runner_orders b
+      	WHERE a.runner_id = b.runner_id
+      		AND (cancellation IS NULL 
+				OR cancellation NOT LIKE '%Cancellation%')) AS 		delivered, 
+      (SELECT COUNT(order_id)
+      	FROM runner_orders b
+      	WHERE a.runner_id = b.runner_id
+      		AND (cancellation IS NULL 
+				OR cancellation NOT LIKE '%Cancellation%'))*100/(SELECT COUNT(order_id) 
+     	FROM runner_orders b
+    	WHERE a.runner_id = b.runner_id) AS delivery_percentage
+FROM runner_orders a
+GROUP BY runner_id;
+
