@@ -175,3 +175,48 @@ SELECT a.runner_id,
 FROM runner_orders a
 GROUP BY runner_id;
 
+-- 1. What are the standard ingredients for each pizza?
+SELECT pizza_id,
+    STRING_AGG(pt.topping_name, ', ' ORDER BY topps::int) AS toppings
+FROM pizza_recipes pr
+CROSS JOIN 
+	unnest(string_to_array(toppings, ',')) AS topps
+JOIN pizza_toppings pt
+ON pt.topping_id = topps::int
+GROUP BY pizza_id
+ORDER BY pizza_id;
+
+-- 2. What was the most commonly added extra?
+SELECT extra_id
+	FROM (SELECT order_id, 
+          	unnest(string_to_array(extras,',')) AS extra_id 
+          FROM customer_orders
+			WHERE extras IS NOT NULL
+				AND extras <> 'null'
+    			AND extras <> '') AS t
+GROUP BY extra_id
+ORDER BY COUNT(extra_id) DESC LIMIT 1;
+
+-- 3. What was the most common exclusion?
+SELECT exclusion_id, 
+	COUNT(exclusion_id)
+    FROM (SELECT unnest(string_to_array(exclusions,',')) 
+          	AS exclusion_id
+          	FROM customer_orders
+          WHERE exclusions IS NOT NULL 
+          	AND exclusions <> ''
+          	AND exclusions <> 'null') AS tab
+GROUP BY exclusion_id
+ORDER BY COUNT(exclusion_id) DESC LIMIT 1;
+
+-- 4. Generate an order item for each record in the customers_orders table in the format of one of the following:
+-- Meat Lovers
+-- Meat Lovers - Exclude Beef
+-- Meat Lovers - Extra Bacon
+-- Meat Lovers - Exclude Cheese, Bacon - Extra Mushroom, Peppers
+
+
+-- 5. Generate an alphabetically ordered comma separated ingredient list for each pizza order from the customer_orders table and add a 2x in front of any relevant ingredients
+-- For example: "Meat Lovers: 2xBacon, Beef, ... , Salami"
+
+-- 6. What is the total quantity of each ingredient used in all delivered pizzas sorted by most frequent first?
