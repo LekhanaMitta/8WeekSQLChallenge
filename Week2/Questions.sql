@@ -267,5 +267,119 @@ GROUP BY pr.pizza_id, topps::int, pt.topping_name;
 
 -- 5. Generate an alphabetically ordered comma separated ingredient list for each pizza order from the customer_orders table and add a 2x in front of any relevant ingredients
 -- For example: "Meat Lovers: 2xBacon, Beef, ... , Salami"
+WITH base AS (
+  SELECT c.order_id, c.customer_id,c.pizza_id, 
+  	pt.topping_name, topps::int AS topping_id
+      FROM pizza_recipes pr
+  CROSS JOIN unnest(string_to_array(toppings,',')) AS topps
+  JOIN pizza_toppings pt 
+  ON pt.topping_id = topps::int
+  JOIN customer_orders c
+  ON c.pizza_id = pr.pizza_id),
+exclusions AS (
+  SELECT c.order_id, c.customer_id, c.pizza_id, 
+      pt.topping_name, excludes::int AS topping_id
+      FROM customer_orders c
+  CROSS JOIN unnest(string_to_array(c.exclusions,',')) 
+  		AS excludes
+  JOIN pizza_toppings pt
+  ON pt.topping_id = excludes::int
+  WHERE excludes <> 'null'
+      AND excludes IS NOT NULL
+      AND excludes <> ''),
+extras AS (
+  SELECT c.order_id, c.customer_id, c.pizza_id, 
+      pt.topping_name, extra::int AS topping_id
+      FROM customer_orders c
+  CROSS JOIN unnest(string_to_array(c.extras,',')) AS extra
+  JOIN pizza_toppings pt
+  ON pt.topping_id = extra::int
+  WHERE extra <> 'null'
+      AND extra IS NOT NULL
+      AND extra <> ''),
+filtered_base AS (
+	SELECT b.order_id, b.customer_id, b.pizza_id,
+  		b.topping_name, b.topping_id
+  		FROM base b
+  	LEFT JOIN exclusions e 
+  	ON e.order_id = b.order_id
+  	AND e.customer_id = b.customer_id
+  	AND e.pizza_id = b.pizza_id
+  	AND e.topping_name = b.topping_name
+  	AND e.topping_id = b.topping_id
+  	WHERE e.topping_id IS NULL),
+all_toppings AS (
+  SELECT * FROM filtered_base
+  UNION ALL 
+  SELECT * FROM extras),
+topping_counts AS (
+    SELECT order_id, customer_id, pizza_id, topping_name,
+        COUNT(*) AS cnt
+    FROM all_toppings
+    GROUP BY order_id, customer_id, pizza_id, topping_name
+)
+SELECT customer_id, order_id, pizza_id,
+	STRING_AGG(cnt || 'x ' || topping_name,',' 
+               ORDER BY topping_name) FROM topping_counts
+GROUP BY pizza_id, order_id, customer_id;
 
 -- 6. What is the total quantity of each ingredient used in all delivered pizzas sorted by most frequent first?
+WITH base AS (
+  SELECT c.order_id, c.customer_id,c.pizza_id, 
+  	pt.topping_name, topps::int AS topping_id
+      FROM pizza_recipes pr
+  CROSS JOIN unnest(string_to_array(toppings,',')) AS topps
+  JOIN pizza_toppings pt 
+  ON pt.topping_id = topps::int
+  JOIN customer_orders c
+  ON c.pizza_id = pr.pizza_id),
+exclusions AS (
+  SELECT c.order_id, c.customer_id, c.pizza_id, 
+      pt.topping_name, excludes::int AS topping_id
+      FROM customer_orders c
+  CROSS JOIN unnest(string_to_array(c.exclusions,',')) 
+  		AS excludes
+  JOIN pizza_toppings pt
+  ON pt.topping_id = excludes::int
+  WHERE excludes <> 'null'
+      AND excludes IS NOT NULL
+      AND excludes <> ''),
+extras AS (
+  SELECT c.order_id, c.customer_id, c.pizza_id, 
+      pt.topping_name, extra::int AS topping_id
+      FROM customer_orders c
+  CROSS JOIN unnest(string_to_array(c.extras,',')) AS extra
+  JOIN pizza_toppings pt
+  ON pt.topping_id = extra::int
+  WHERE extra <> 'null'
+      AND extra IS NOT NULL
+      AND extra <> ''),
+filtered_base AS (
+	SELECT b.order_id, b.customer_id, b.pizza_id,
+  		b.topping_name, b.topping_id
+  		FROM base b
+  	LEFT JOIN exclusions e 
+  	ON e.order_id = b.order_id
+  	AND e.customer_id = b.customer_id
+  	AND e.pizza_id = b.pizza_id
+  	AND e.topping_name = b.topping_name
+  	AND e.topping_id = b.topping_id
+  	WHERE e.topping_id IS NULL),
+all_toppings AS (
+  SELECT * FROM filtered_base
+  UNION ALL 
+  SELECT * FROM extras),
+topping_counts AS (
+    SELECT order_id, customer_id, pizza_id, topping_name,
+        COUNT(*) AS cnt
+    FROM all_toppings
+    GROUP BY order_id, customer_id, pizza_id, topping_name
+)
+SELECT a.order_id, a.topping_name, COUNT(*) 
+FROM all_toppings a
+JOIN runner_orders r 
+ON r.order_id = a.order_id
+WHERE Cancellation NOT LIKE '%Cancellation%'
+	OR Cancellation IS NULL
+GROUP BY a.order_id, topping_name
+ORDER BY a.order_id, topping_name;
