@@ -214,6 +214,55 @@ ORDER BY COUNT(exclusion_id) DESC LIMIT 1;
 -- Meat Lovers - Exclude Beef
 -- Meat Lovers - Extra Bacon
 -- Meat Lovers - Exclude Cheese, Bacon - Extra Mushroom, Peppers
+SELECT pizza_id, 
+	STRING_AGG(pt.topping_name,', ' ORDER BY topps::int) AS toppings
+FROM pizza_recipes pr
+CROSS JOIN 
+    unnest(string_to_array(toppings,',')) AS topps
+JOIN pizza_toppings pt
+ON pt.topping_id = topps::int
+GROUP BY pr.pizza_id;
+
+-- Meat Lovers - Exclude Beef
+SELECT pizza_id,
+	STRING_AGG(topping_name, ',' ORDER BY topps::int) AS topping
+FROM pizza_recipes pr
+CROSS JOIN unnest(string_to_array(toppings,',')) AS topps
+JOIN pizza_toppings pt
+ON pt.topping_id = topps::int
+WHERE pt.topping_name <> 'Beef' AND pr.pizza_id = 1
+GROUP BY pr.pizza_id;
+
+-- Meat Lovers - Extra Bacon
+SELECT pizza_id, pt.topping_name,
+	COUNT(topps::int) + 
+    (CASE
+    	WHEN pt.topping_name = 'Bacon' THEN 1
+        ELSE 0
+    END) AS Counts 
+FROM pizza_recipes pr
+CROSS JOIN unnest(string_to_array(toppings,',')) AS topps
+JOIN pizza_toppings pt
+ON pt.topping_id = topps::int
+WHERE pr.pizza_id = 1
+GROUP BY pr.pizza_id, topps::int, pt.topping_name;
+
+-- Meat Lovers - Exclude Cheese, Bacon - Extra Mushroom, Peppers
+SELECT pizza_id, pt.topping_name, 
+COUNT(*) +
+	(CASE 
+    	WHEN pt.topping_name IN ('Cheese', 'Bacon') THEN -1
+        WHEN pt.topping_name IN ('Mushrooms', 'Peppers') THEN 1
+     	ELSE 0
+    END) AS topping_count
+FROM pizza_recipes pr
+CROSS JOIN unnest(string_to_array(toppings,',')) AS topps
+JOIN pizza_toppings pt
+ON pt.topping_id = topps::int
+WHERE pr.pizza_id = 1
+GROUP BY pr.pizza_id, topps::int, pt.topping_name;
+	
+
 
 
 -- 5. Generate an alphabetically ordered comma separated ingredient list for each pizza order from the customer_orders table and add a 2x in front of any relevant ingredients
