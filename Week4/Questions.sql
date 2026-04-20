@@ -1,5 +1,5 @@
 -- A. Customer Nodes Exploration
-1. How many unique nodes are there on the Data Bank system?
+-- 1. How many unique nodes are there on the Data Bank system?
 SELECT COUNT(DISTINCT(node_id)) AS unique_nodes
 FROM customer_nodes;
 
@@ -14,23 +14,23 @@ SELECT region_id, COUNT(DISTINCT(customer_id))
 GROUP BY region_id;
 
 -- 4. How many days on average are customers reallocated to a different node? 
-SELECT 
-	AVG(EXTRACT (DAY FROM end_date) - 
-        EXTRACT (DAY FROM start_date)) AS reallocated_days
-	FROM customer_nodes;
+-- SELECT AVG(end_date - start_date) AS reallocation_days
+-- 	FROM customer_nodes
+-- WHERE end_date IS NOT NULL
+--   	AND end_date != '9999-12-31';
 
 -- 5. What is the median, 80th and 95th percentile for this same reallocation days metric for each region?
 SELECT region_id,
+	AVG(end_date - start_date) AS avg_days,
 	PERCENTILE_DISC(0.5) WITHIN GROUP(
-      ORDER BY (EXTRACT(day FROM end_date) -
-        EXTRACT(day FROM start_date))) AS p_50,
+      ORDER BY (end_date - start_date)) AS p_50,
     PERCENTILE_DISC(0.80) WITHIN GROUP(
-      ORDER BY (EXTRACT(day FROM end_date) -
-        EXTRACT(day FROM start_date))) AS p_80,
+      ORDER BY (end_date - start_date)) AS p_80,
     PERCENTILE_DISC(0.95) WITHIN GROUP(
-      ORDER BY (EXTRACT(day FROM end_date) -
-        EXTRACT(day FROM start_date))) AS p_95
+      ORDER BY (end_date - start_date)) AS p_95
 FROM customer_nodes
+WHERE end_date IS NOT NULL
+	AND end_date != '9999-12-31'
 GROUP BY region_id
 ORDER BY region_id;
 
